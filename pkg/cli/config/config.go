@@ -1,7 +1,10 @@
 package config
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -97,12 +100,86 @@ func GetBackplaneConfiguration() (bpConfig BackplaneConfiguration, err error) {
 	return bpConfig, nil
 }
 
+// verifyBackplaneConfiguration checks the configuration for invalid configurations
+// returns a warning/error
+func verifyBackplaneConfiguration(bpConfig BackplaneConfiguration) error {
+	urlString := bpConfig.URL
+	sessionDirectoryString := bpConfig.SessionDirectory
+	AssumeInitialArnString := bpConfig.AssumeInitialArn
+	// ProxyURL := bpConfig.ProxyURL
+
+	urlStringLen := len(urlString)
+	sessionDirectoryLen := len(sessionDirectoryString)
+	AssumeInitialArnStringLen := len(AssumeInitialArnString)
+
+	var b []byte
+	var err error
+
+	// ProxyURLLen := len(ProxyURL)
+
+	filePath, err := GetConfigFilePath()
+	if err != nil {
+		return err
+	}
+
+	// Check if the config file exists
+	if _, err = os.Stat(filePath); err == nil {
+		configfile, err := os.Open(filePath)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			err = configfile.Close()
+		}()
+
+		if b, err = ioutil.ReadAll(configfile); err != nil {
+			return err
+		}
+	}
+
+	logger.Info("Validating backplane config fields...\n")
+
+	if urlStringLen == 0 {
+		logger.Warn("url in backplane config is either empty or undefined, please define the field url")
+	}
+	if sessionDirectoryLen == 0 {
+		logger.Warn("SessionDirectory in backplane config is either empty or undefined, please define the field SessionDirectory")
+	}
+	if AssumeInitialArnStringLen == 0 {
+		logger.Warn("assume-initial-arn in backplane config is either empty or undefined, please define the field assume-initial-arn")
+	}
+
+	// For mandatory fields only
+	// e.g url and arn
+	if urlStringLen == 0 || AssumeInitialArnStringLen == 0 {
+		fmt.Println("Your backplane CLI Config should contain at a minimum:")
+		fmt.Println("{")
+		fmt.Println("url: <url in quotes>")
+		fmt.Println("assume-initial-arn: <arn in quotes>")
+		fmt.Println("}")
+		fmt.Println("NOTE: It's reccomened that you define url as an evironment varible proxy-url as manual URL configuration is deprecated")
+		fmt.Println("")
+		fmt.Println("Your current specified config file shows:")
+
+		dst := &bytes.Buffer{}
+		if err := json.Indent(dst, b, "", "  "); err != nil {
+			return err
+		}
+
+		fmt.Println(dst.String())
+
+	} else {
+		logger.Info("Config Fields are populated and not empty")
+	}
+
+	return err
+}
+
 var clientDo = func(client *http.Client, req *http.Request) (*http.Response, error) {
 	return client.Do(req)
 }
 
-
-func (config *BackplaneConfiguration) getFirstWorkingProxyURL(s []string) (string) {
+func (config *BackplaneConfiguration) getFirstWorkingProxyURL(s []string) string {
 	bpURL := config.URL + "/healthz"
 
 	client := &http.Client{
