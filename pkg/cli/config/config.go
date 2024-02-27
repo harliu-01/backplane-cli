@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -98,7 +97,7 @@ func GetBackplaneConfiguration() (bpConfig BackplaneConfiguration, err error) {
 	return bpConfig, nil
 }
 
-// verifyBackplaneConfiguration checks the configuration for invalid configurations
+// verifyBackplaneConfiguration checks the backplane configuration datastructure for missing fields
 // returns a warning/error
 func verifyBackplaneConfiguration(bpConfig BackplaneConfiguration) error {
 	urlString := bpConfig.URL
@@ -109,54 +108,40 @@ func verifyBackplaneConfiguration(bpConfig BackplaneConfiguration) error {
 	sessionDirectoryLen := len(sessionDirectoryString)
 	AssumeInitialArnStringLen := len(AssumeInitialArnString)
 
-	var err error
-
-	filePath, err := GetConfigFilePath()
-	if err != nil {
-		return err
-	}
+	missing := ""
 
 	logger.Info("Validating backplane config fields...\n")
 
 	if urlStringLen == 0 {
-		logger.Warn("url in backplane config is either empty or undefined, please define the field url")
+		missing = missing + "assume-initial-arn, url"
+		logger.Warn("url in backplane config is either empty or undefined, please define the field url or use the environment varible BACKPLANE_URL")
 	}
+	// This is usually not a problem
 	if sessionDirectoryLen == 0 {
-		logger.Warn("SessionDirectory in backplane config is either empty or undefined, please define the field SessionDirectory")
+		logger.Info("session-dir in backplane config is either empty or undefined")
 	}
 	if AssumeInitialArnStringLen == 0 {
+		missing = missing + "assume-initial-arn,"
 		logger.Warn("assume-initial-arn in backplane config is either empty or undefined, please define the field assume-initial-arn")
 	}
 
 	// For mandatory fields only
 	// e.g url and arn
 	if urlStringLen == 0 || AssumeInitialArnStringLen == 0 {
-		fmt.Println("Your backplane CLI Config should contain at a minimum:")
+		fmt.Println("Attention, your backplane config is incomplete, as either your ocm token or assume-initial-arn is undefined")
+		fmt.Println("Your backplane CLI Config as a best practice should contain")
 		fmt.Println("{")
-		fmt.Println("url: <url in quotes>")
+		fmt.Println("proxy-url: <proxy url in quotes>")
 		fmt.Println("assume-initial-arn: <arn in quotes>")
 		fmt.Println("}")
-		fmt.Println("NOTE: It's reccomened that you define url as an evironment varible proxy-url as manual URL configuration is deprecated")
-		fmt.Println("")
-		fmt.Println("Your current specified config file shows:")
+		fmt.Println("NOTE: backplane url is typically extracted via the ocm token and manual definitions is deprecated")
+		fmt.Println("If you need to manually define a backplane url, set an environment varible called BACKPLANE_URL")
 
-		// Check if the config file exists
-		if _, err = os.Stat(filePath); err == nil {
-			configfile, err := os.Open(filePath)
-			if err != nil {
-				return err
-			}
-			_, err = io.Copy(os.Stdout, configfile)
-			if err != nil {
-				fmt.Println("Error copying file content:", err)
-			}
-			configfile.Close()
-		}
-
+		return fmt.Errorf("The backplane configuration file or environment varibles are missing mandatory fields %v", missing)
 	} else {
-		logger.Info("Config Fields are populated and not empty")
+		logger.Info("Config Fields Checks Complete")
 	}
-	return err
+	return nil
 }
 
 var clientDo = func(client *http.Client, req *http.Request) (*http.Response, error) {
