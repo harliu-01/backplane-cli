@@ -1,10 +1,8 @@
 package config
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -106,35 +104,16 @@ func verifyBackplaneConfiguration(bpConfig BackplaneConfiguration) error {
 	urlString := bpConfig.URL
 	sessionDirectoryString := bpConfig.SessionDirectory
 	AssumeInitialArnString := bpConfig.AssumeInitialArn
-	// ProxyURL := bpConfig.ProxyURL
 
 	urlStringLen := len(urlString)
 	sessionDirectoryLen := len(sessionDirectoryString)
 	AssumeInitialArnStringLen := len(AssumeInitialArnString)
 
-	var b []byte
 	var err error
-
-	// ProxyURLLen := len(ProxyURL)
 
 	filePath, err := GetConfigFilePath()
 	if err != nil {
 		return err
-	}
-
-	// Check if the config file exists
-	if _, err = os.Stat(filePath); err == nil {
-		configfile, err := os.Open(filePath)
-		if err != nil {
-			return err
-		}
-		defer func() {
-			err = configfile.Close()
-		}()
-
-		if b, err = ioutil.ReadAll(configfile); err != nil {
-			return err
-		}
 	}
 
 	logger.Info("Validating backplane config fields...\n")
@@ -161,17 +140,22 @@ func verifyBackplaneConfiguration(bpConfig BackplaneConfiguration) error {
 		fmt.Println("")
 		fmt.Println("Your current specified config file shows:")
 
-		dst := &bytes.Buffer{}
-		if err := json.Indent(dst, b, "", "  "); err != nil {
-			return err
+		// Check if the config file exists
+		if _, err = os.Stat(filePath); err == nil {
+			configfile, err := os.Open(filePath)
+			if err != nil {
+				return err
+			}
+			_, err = io.Copy(os.Stdout, configfile)
+			if err != nil {
+				fmt.Println("Error copying file content:", err)
+			}
+			configfile.Close()
 		}
-
-		fmt.Println(dst.String())
 
 	} else {
 		logger.Info("Config Fields are populated and not empty")
 	}
-
 	return err
 }
 

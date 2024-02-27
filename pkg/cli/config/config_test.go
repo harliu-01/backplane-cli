@@ -28,6 +28,37 @@ func TestGetBackplaneConfig(t *testing.T) {
 
 }
 
+func TestRunVerifyConfig(t *testing.T) {
+	t.Run("Begin by verifying the integrity of GetBackplaneConfiguration, then verify it through verifyBackplaneConfiguration", func(t *testing.T) {
+
+		//userDefinedProxy := "example-proxy"
+		//t.Setenv("BACKPLANE_URL", svr.URL)
+		//t.Setenv("HTTPS_PROXY", userDefinedProxy)
+		// svr := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// 	_, _ = w.Write([]byte("dummy data"))
+		// }))
+
+		// userDefinedProxy := "example-proxy"
+		t.Setenv("BACKPLANE_URL", "")
+		t.Setenv("HTTPS_PROXY", "")
+		config, err := GetBackplaneConfiguration()
+		if err != nil {
+			t.Error(err)
+		}
+
+		//if config.ProxyURL != nil && *config.ProxyURL != userDefinedProxy {
+		//	t.Errorf("expected to return the explicitly defined proxy %v instead of the default one %v", userDefinedProxy, config.ProxyURL)
+		//}
+
+		err1 := verifyBackplaneConfiguration(config)
+		if err1 != nil {
+			t.Errorf("Expected there to be no errors in config file")
+			t.Error(err1)
+		}
+	})
+
+}
+
 func TestGetBackplaneConnection(t *testing.T) {
 	t.Run("should fail if backplane API return connection errors", func(t *testing.T) {
 
@@ -83,7 +114,7 @@ func TestBackplaneConfiguration_getFirstWorkingProxyURL(t *testing.T) {
 			clientDoFunc: func(client *http.Client, req *http.Request) (*http.Response, error) {
 				return &http.Response{StatusCode: http.StatusOK}, nil
 			},
-			want:    "https://dummy.com",
+			want: "https://dummy.com",
 		},
 		{
 			name:    "multiple-valid-proxies",
@@ -91,7 +122,7 @@ func TestBackplaneConfiguration_getFirstWorkingProxyURL(t *testing.T) {
 			clientDoFunc: func(client *http.Client, req *http.Request) (*http.Response, error) {
 				return &http.Response{StatusCode: http.StatusOK}, nil
 			},
-			want:    "https://dummy.com",
+			want: "https://dummy.com",
 		},
 		{
 			name:    "multiple-mixed-proxies",
@@ -99,7 +130,7 @@ func TestBackplaneConfiguration_getFirstWorkingProxyURL(t *testing.T) {
 			clientDoFunc: func(client *http.Client, req *http.Request) (*http.Response, error) {
 				return &http.Response{StatusCode: http.StatusOK}, nil
 			},
-			want:    "https://dummy.com",
+			want: "https://dummy.com",
 		},
 	}
 	for _, tt := range tests {
