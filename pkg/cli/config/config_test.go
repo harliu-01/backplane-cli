@@ -29,34 +29,18 @@ func TestGetBackplaneConfig(t *testing.T) {
 }
 
 func TestRunVerifyConfig(t *testing.T) {
-	t.Run("Begin by verifying the integrity of GetBackplaneConfiguration, then verify it through verifyBackplaneConfiguration", func(t *testing.T) {
+	t.Run("Begin by getting the backplane configuration which appears to be intentionally broken, then verify it through verifyBackplaneConfiguration", func(t *testing.T) {
 
-		//userDefinedProxy := "example-proxy"
-		//t.Setenv("BACKPLANE_URL", svr.URL)
-		//t.Setenv("HTTPS_PROXY", userDefinedProxy)
-		// svr := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// 	_, _ = w.Write([]byte("dummy data"))
-		// }))
-
-		// userDefinedProxy := "example-proxy"
 		t.Setenv("BACKPLANE_URL", "")
 		t.Setenv("HTTPS_PROXY", "")
 		config, err := GetBackplaneConfiguration()
 		if err != nil {
-			t.Error(err)
+			t.Fail()
 		}
-
-		//if config.ProxyURL != nil && *config.ProxyURL != userDefinedProxy {
-		//	t.Errorf("expected to return the explicitly defined proxy %v instead of the default one %v", userDefinedProxy, config.ProxyURL)
-		//}
-
-		err1 := verifyBackplaneConfiguration(config)
-		if err1 != nil {
-			t.Errorf("Expected there to be no errors in config file")
-			t.Error(err1)
+		if VerifyBackplaneConfiguration(config) {
+			t.Fail()
 		}
 	})
-
 }
 
 func TestGetBackplaneConnection(t *testing.T) {
