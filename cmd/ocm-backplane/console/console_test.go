@@ -1,9 +1,11 @@
 package console
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"reflect"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo"
@@ -490,11 +492,18 @@ var _ = Describe("console command", func() {
 			o.openBrowser = false
 			o.containerEngineFlag = DOCKER
 
+			ctx, cancelFunc := context.WithCancel(context.Background())
+
+			cobraCommander := &cobra.Command{}
+			cobraCommander.SetContext(ctx)
+			go func() {
+				time.Sleep(time.Second)
+				cancelFunc()
+			}()
+
 			argvstrs1 := []string{"console_GO_test"}
-			err := o.run(&cobra.Command{}, argvstrs1)
-			// There isn't any way to stop the o.run loop while testing, so we have to feed it a varible to force a termination
-			// Prematurely the cleanup function isn't called.
-			Expect(err).To(MatchError(ContainSubstring("test concluded sucessfully")))
+			err := o.run(cobraCommander, argvstrs1)
+			Expect(err).To(BeNil())
 			os.Setenv("BACKPLANE_DEFAULT_OPEN_BROWSER", "")
 			removePath(oldpath)
 		})

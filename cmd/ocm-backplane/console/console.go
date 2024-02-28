@@ -143,7 +143,10 @@ func NewConsoleCmd() *cobra.Command {
 		You can specify container engine with -c. If not specified, it will lookup the PATH in the order of podman and docker.
 `,
 		SilenceUsage: true,
-		RunE:         ops.run,
+		PreRun: func(cmd *cobra.Command, args []string) {
+			cmd.SetContext(context.Background())
+		},
+		RunE: ops.run,
 	}
 
 	flags := consoleCmd.Flags()
@@ -247,12 +250,10 @@ func (o *consoleOptions) run(cmd *cobra.Command, argv []string) error {
 	if err != nil {
 		return err
 	}
-	// If this is a test scenario, we throw an error as opposed of keeping this function in a infinite loop
-	if len(argv) != 0 && argv[0] == "console_GO_test" {
-		return fmt.Errorf("test concluded sucessfully")
+	if cmd.Context() == nil {
+		fmt.Println("Context is nil")
 	}
-
-	err = o.cleanUp(ce)
+	err = o.cleanUp(ce, cmd.Context())
 	if err != nil {
 		return err
 	}
@@ -615,7 +616,7 @@ func (o *consoleOptions) printURL() error {
 	return nil
 }
 
-func (o *consoleOptions) cleanUp(ce containerEngineInterface) error {
+func (o *consoleOptions) cleanUp(ce containerEngineInterface, ctx context.Context) error {
 	clusterID, err := getClusterID()
 	if err != nil {
 		return err
@@ -640,7 +641,7 @@ func (o *consoleOptions) cleanUp(ce containerEngineInterface) error {
 			logger.Infoln(fmt.Sprintf("Container removed: %s", c))
 		}
 		return nil
-	})
+	}, ctx)
 
 	return err
 }
@@ -906,17 +907,29 @@ func replaceConsoleURL(containerURL string, userProvidedURL string) (string, err
 type postTerminationAction func() error
 
 // keep the program running in frontend and wait for ctrl-c
-func execActionOnTermination(action postTerminationAction) error {
+func execActionOnTermination(action postTerminationAction, ctx context.Context) error {
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 	done := make(chan bool, 1)
 
-	sig := <-sigs
-	fmt.Println(sig)
-	done <- true
-	err := action()
-	if err != nil {
-		return err
+	select {
+	case <-sigs:
+		sig := <-sigs
+		fmt.Println(sig)
+		done <- true
+		err := action()
+		if err != nil {
+			return err
+		}
+
+	case <-ctx.Done():
+		fmt.Println("Context Complete")
+		err := action()
+		if err != nil {
+			return err
+		}
+		return nil
+
 	}
 	return nil
 }
