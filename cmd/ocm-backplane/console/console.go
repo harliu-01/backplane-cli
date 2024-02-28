@@ -913,8 +913,7 @@ func execActionOnTermination(action postTerminationAction, ctx context.Context) 
 	done := make(chan bool, 1)
 
 	select {
-	case <-sigs:
-		sig := <-sigs
+	case sig := <-sigs:
 		fmt.Println(sig)
 		done <- true
 		err := action()
